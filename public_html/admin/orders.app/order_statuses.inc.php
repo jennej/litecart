@@ -17,6 +17,7 @@
       <th></th>
       <th class="main"><?php echo language::translate('title_name', 'Name'); ?></th>
       <th><?php echo language::translate('title_sales', 'Sales'); ?></th>
+      <th><?php echo language::translate('title_active', 'Active'); ?></th>
       <th><?php echo language::translate('title_archived', 'Archived'); ?></th>
       <th><?php echo language::translate('title_notify', 'Notify'); ?></th>
       <th><?php echo language::translate('title_priority', 'Priority'); ?></th>
@@ -48,6 +49,7 @@
     <td><?php echo functions::draw_fonticon($order_status['icon'], 'style="color: '. $order_status['color'] .';"'); ?></td>
     <td><a href="<?php echo document::href_link('', array('doc' => 'edit_order_status', 'order_status_id' => $order_status['id']), true); ?>"><?php echo $order_status['name']; ?></a></td>
     <td class="text-center"><?php echo !empty($order_status['is_sale']) ? functions::draw_fonticon('fa-check') : ''; ?></td>
+    <td class="text-center"><?php echo empty($order_status['is_active']) ? '' : functions::draw_fonticon('fa-check'); ?></td>
     <td class="text-center"><?php echo empty($order_status['is_archived']) ? '' : functions::draw_fonticon('fa-check'); ?></td>
     <td class="text-center"><?php echo !empty($order_status['notify']) ? functions::draw_fonticon('fa-check') : ''; ?></td>
     <td class="text-center"><?php echo $order_status['priority']; ?></td>

@@ -214,7 +214,7 @@
           $icon = functions::draw_fonticon('fa-times');
           break;
         case 'delete':
-          $icon = functions::draw_fonticon('fa-trash-o');
+          $icon = functions::draw_fonticon('fa-remove');
           break;
         case 'on':
           $icon = functions::draw_fonticon('fa-circle', 'style="font-size: 0.75em; color: #99cc66;"');
@@ -471,6 +471,12 @@
     }
 
     switch ($matches[1]) {
+     case 'date':
+        return functions::form_draw_date_field($name, $input);
+      case 'datetime':
+        return functions::form_draw_datetime_field($name, $input);
+      case 'time':
+        return functions::form_draw_time_field($name, $input);
       case 'decimal':
       case 'float':
         return functions::form_draw_decimal_field($name, $input, 2);
@@ -702,7 +708,7 @@
     if (empty($multiple)) $options[] = array('-- '. language::translate('title_select', 'Select') . ' --', '');
 
     if (database::num_rows($geo_zones_query) == 0) {
-      return form_draw_select_field($name, $options, $input, false, false, $parameters . ' disabled="disabled"');
+      return functions::form_draw_hidden_field($name, '0') . form_draw_select_field($name, $options, $input, false, false, $parameters . ' disabled="disabled"');
     }
 
     while ($geo_zone = database::fetch($geo_zones_query)) {
@@ -714,12 +720,17 @@
 
   function form_draw_google_taxonomy_categories_list($name, $input=true, $multiple=false, $parameters='') {
 
+    return functions::form_draw_number_field($name, $input);
+
+    /*
     $cache_id = cache::cache_id('google_taxonomy_categories', array('language'));
 
     if (!$response = cache::get($cache_id, 'file', 2592000, true)) {
       $response = file_get_contents('http://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt');
 
-      if (empty($response)) return functions::form_draw_number_field($name, $input);
+      if (empty($response)) {
+        return functions::form_draw_number_field($name, $input);
+      }
 
       $response = preg_replace('/^(\#.*\R)$/', '', $response);
       cache::set($cache_id, 'file', $response);
@@ -736,6 +747,7 @@
     }
 
     return functions::form_draw_select_field($name, $options, $input, $multiple, $parameters);
+    */
   }
 
   function form_draw_languages_list($name, $input=true, $multiple=false, $parameters='') {
@@ -1087,7 +1099,7 @@
     }
 
     if (database::num_rows($zones_query) == 0) {
-      return form_draw_select_field($name, $options, $input, $multiple, $parameters . ' disabled="disabled"');
+      return functions::form_draw_hidden_field($name, '') . form_draw_select_field($name, $options, $input, $multiple, $parameters . ' disabled="disabled"');
     }
 
     while ($zone = database::fetch($zones_query)) {

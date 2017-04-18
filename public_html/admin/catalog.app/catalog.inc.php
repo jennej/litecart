@@ -205,6 +205,8 @@
         <th><?php echo functions::draw_fonticon('fa-check-square-o fa-fw checkbox-toggle', 'data-toggle="checkbox-toggle"'); ?></th>
         <th>&nbsp;</th>
         <th class="main"><?php echo language::translate('title_name', 'Name'); ?></th>
+        <th class="main"><?php echo language::translate('title_quantity', 'Quantity'); ?></th>
+        <th class="main"><?php echo language::translate('title_price', 'Price'); ?></th>
         <th></th>
         <th>&nbsp;</th>
       </tr>
@@ -244,7 +246,9 @@
         <td><?php echo functions::form_draw_checkbox('products['. $product['id'] .']', $product['id']); ?></td>
         <td><?php echo functions::draw_fonticon('fa-circle', 'style="color: '. (!empty($product['status']) ? '#99cc66' : '#ff6666') .';"'); ?></td>
       <td><?php echo '<img src="'. functions::image_thumbnail(FS_DIR_HTTP_ROOT . WS_DIR_IMAGES . $product['image'], 16, 16, 'FIT_USE_WHITESPACING') .'" alt="" style="width: 16px; height: 16px; vertical-align: bottom;" />'; ?><a href="<?php echo document::href_link('', array('app' => $_GET['app'], 'doc' => 'edit_product', 'product_id' => $product['id'])); ?>"> <?php echo $product['name']; ?></a></td>
-        <td></td>
+        <td style="text-align: right;"></td>
+        <td style="text-align: right;"></td>
+        <td style="text-align: right;"></td>
         <td class="text-right"><a href="<?php echo document::href_link('', array('app' => $_GET['app'], 'doc' => 'edit_product', 'product_id' => $product['id'])); ?>" title="<?php echo language::translate('title_edit', 'Edit'); ?>"><?php echo functions::draw_fonticon('fa-pencil'); ?></a></td>
       </tr>
 <?php
@@ -280,6 +284,8 @@
                  . '  <td>'. functions::draw_fonticon('fa-folder-open', 'style="color: #cccc66;"') .' <strong><a href="'. document::href_link('', array('category_id' => '0'), true) .'">['. language::translate('title_root', 'Root') .']</a></strong></td>' . PHP_EOL
                  . '  <td>&nbsp;</td>' . PHP_EOL
                  . '  <td>&nbsp;</td>' . PHP_EOL
+                 . '  <td>&nbsp;</td>' . PHP_EOL
+                 . '  <td>&nbsp;</td>' . PHP_EOL
                  . '</tr>' . PHP_EOL;
       }
 
@@ -304,6 +310,8 @@
           $output .= '  <td>'. functions::draw_fonticon('fa-folder', 'style="color: #cccc66; margin-left: '. ($depth*16) .'px;"') .' <a href="'. document::href_link('', array('category_id' => $category['id']), true) .'">'. ($category['name'] ? $category['name'] : '[untitled]') .'</a></td>' . PHP_EOL;
         }
         $output .= '  <td>&nbsp;</td>' . PHP_EOL
+                 . '  <td>&nbsp;</td>' . PHP_EOL
+                 . '  <td>&nbsp;</td>' . PHP_EOL
                  . '  <td class="text-right"><a href="'. document::href_link('', array('app' => $_GET['app'], 'doc' => 'edit_category', 'category_id' => $category['id'])) .'" title="'. language::translate('title_edit', 'Edit') .'">'. functions::draw_fonticon('fa-pencil').'</a></td>' . PHP_EOL
                  . '</tr>' . PHP_EOL;
 
@@ -347,7 +355,8 @@
       $output = '';
 
       $products_query = database::query(
-        "select p.id, p.status, p.image, pi.name, p2c.category_id from ". DB_TABLE_PRODUCTS ." p
+        "select p.id, p.status, p.quantity, pp.USD, p.image, pi.name, p2c.category_id from ". DB_TABLE_PRODUCTS ." p
+        left join ". DB_TABLE_PRODUCTS_PRICES ." pp on (pp.product_id = p.id)
         left join ". DB_TABLE_PRODUCTS_INFO ." pi on (pi.product_id = p.id and pi.language_code = '". language::$selected['code'] ."')
         left join ". DB_TABLE_PRODUCTS_TO_CATEGORIES ." p2c on (p2c.product_id = p.id)
         where ". (!empty($category_id) ? "p2c.category_id = ". (int)$category_id : "(p2c.category_id is null or p2c.category_id = 0)") ."
@@ -372,7 +381,8 @@
         } else {
           $output .= '  <td><span style="margin-left: '. (($depth+1)*16) .'px;">&nbsp;<a href="'. document::href_link('', array('app' => $_GET['app'], 'doc' => 'edit_product', 'category_id' => $category_id, 'product_id' => $product['id'])) .'">'. $product['name'] .'</a></span></td>' . PHP_EOL;
         }
-
+        $output .= '  <td> '.$product['quantity'].'</td>'. PHP_EOL;
+        $output .= '  <td> $'.$product['USD'].'</td>'. PHP_EOL;
         $output .= '  <td style="text-align: right;"></td>' . PHP_EOL
                  . '  <td class="text-right"><a href="'. document::href_link('', array('app' => $_GET['app'], 'doc' => 'edit_product', 'category_id' => $category_id, 'product_id' => $product['id'])) .'" title="'. language::translate('title_edit', 'Edit') .'">'. functions::draw_fonticon('fa-pencil').'</a></td>' . PHP_EOL
                  . '</tr>' . PHP_EOL;

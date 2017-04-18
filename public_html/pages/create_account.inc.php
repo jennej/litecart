@@ -38,7 +38,7 @@
     if (empty($_POST['lastname'])) notices::add('errors', language::translate('error_missing_lastname', 'You must enter a last name.'));
     //if (empty($_POST['address1'])) notices::add('errors', language::translate('error_missing_address1', 'You must enter an address.'));
     //if (empty($_POST['city'])) notices::add('errors', language::translate('error_missing_city', 'You must enter a city.'));
-    //if (empty($_POST['postcode']) && !empty($_POST['country_code']) && reference::country($_POST['country_code'])->postcode_format) notices::add('errors', language::translate('error_missing_postcode', 'You must enter a postcode.'));
+    if (empty($_POST['postcode']) && !empty($_POST['country_code']) && reference::country($_POST['country_code'])->postcode_format) notices::add('errors', language::translate('error_missing_postcode', 'You must enter a zipcode.'));
     if (empty($_POST['country_code'])) notices::add('errors', language::translate('error_missing_country', 'You must select a country.'));
     if (empty($_POST['zone_code']) && !empty($_POST['country_code']) && reference::country($_POST['country_code'])->zones) notices::add('errors', language::translate('error_missing_zone', 'You must select a zone.'));
 
@@ -76,7 +76,7 @@
 
       $customer->set_password($_POST['password']);
 
-      $email_message = language::translate('email_account_created', "Welcome %customer_firstname %customer_lastname to %store_name!\r\n\r\nYour account has been created. You can now make purchases in our online store and keep track of history.\r\n\r\nLogin using your email address %customer_email and password %customer_password.\r\n\r\n%store_name\r\n\r\n%store_link");
+      $email_message = language::translate('email_account_created', "Welcome %customer_firstname %customer_lastname to %store_name!\r\n\r\nYour account has been created. You can now make purchases in our online store and keep track of history.\r\n\r\nLogin using your email address %customer_email and password.\r\n\r\n%store_name\r\n\r\n%store_link");
 
       $translations = array(
         '%store_name' => settings::get('store_name'),
@@ -84,7 +84,6 @@
         '%customer_firstname' => $_POST['firstname'],
         '%customer_lastname' => $_POST['lastname'],
         '%customer_email' => $_POST['email'],
-        '%customer_password' => $_POST['password']
       );
 
       foreach ($translations as $needle => $replace) {

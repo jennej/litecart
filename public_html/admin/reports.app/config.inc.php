@@ -2,7 +2,7 @@
 
   $app_config = array(
     'name' => language::translate('title_reports', 'Reports'),
-    'default' => 'monthly_sales',
+    'default' => 'open_orders',
     'theme' => array(
       'color' => '#b79d82',
       'icon' => 'fa-pie-chart',
@@ -23,10 +23,18 @@
         'doc' => 'most_shopping_customers',
         'params' => array(),
       ),
+      array(
+        'title' => language::translate('title_open_orders', 'Open Orders'),
+        'doc' => 'open_orders',
+        'params' => array(),
+      ),
     ),
     'docs' => array(
       'monthly_sales' => 'monthly_sales.inc.php',
       'most_sold_products' => 'most_sold_products.inc.php',
       'most_shopping_customers' => 'most_shopping_customers.inc.php',
+      'open_orders' => 'open_orders.inc.php',
     ),
   );
+
+?>

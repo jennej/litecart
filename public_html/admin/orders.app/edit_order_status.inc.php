@@ -20,6 +20,7 @@
 
     if (empty($_POST['notify'])) $_POST['notify'] = 0;
     if (empty($_POST['is_sale'])) $_POST['is_sale'] = 0;
+    if (empty($_POST['is_active'])) $_POST['is_active'] = 0;
     if (empty($_POST['is_archived'])) $_POST['is_archived'] = 0;
 
     if (empty(notices::$data['errors'])) {
@@ -28,6 +29,7 @@
         'icon',
         'color',
         'is_sale',
+        'is_active',
         'is_archived',
         'notify',
         'priority',
@@ -78,6 +80,10 @@
         <?php echo language::translate('order_status:description_is_sale', 'Reserve/withdraw stock and include in sales reports'); ?></label>
       </div>
 
+      <div class="checkbox">
+        <label><?php echo functions::form_draw_checkbox('is_active', '1', empty($_POST['is_active']) ? '0' : '1'); ?> <?php echo language::translate('text_is_active', 'Is active');?><br />
+        <?php echo language::translate('order_status:description_is_active', 'Collated in the active order report.'); ?></label>
+      </div>
       <div class="checkbox">
         <label><?php echo functions::form_draw_checkbox('is_archived', '1', empty($_POST['is_archived']) ? '0' : '1'); ?> <?php echo language::translate('text_is_archived', 'Is archived');?><br />
         <?php echo language::translate('order_status:description_is_archived', 'Exclude from the default list of orders'); ?></label>
