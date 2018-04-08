@@ -37,7 +37,7 @@
       );
 
       if ($currency = database::fetch($currency_query)) {
-        $this->data = array_intersect_key(array_merge($this->data, $currency), $this->data);
+        $this->data = array_replace($this->data, array_intersect_key($currency, $this->data));
       } else {
         trigger_error('Could not find currency (Code: '. htmlspecialchars($currency_code) .') in database.', E_USER_ERROR);
       }
@@ -62,9 +62,10 @@
           limit 1;"
         );
         $currency = database::fetch($currencies_query);
+
         if ($this->data['code'] != $currency['code']) {
           if ($currency['code'] == settings::get('store_currency_code')) {
-            trigger_error('Cannot rename the store system currency.', E_USER_ERROR);
+            trigger_error('Cannot rename the store currency.', E_USER_ERROR);
           } else {
             database::query(
               "alter table ". DB_TABLE_PRODUCTS_PRICES ."
@@ -147,7 +148,7 @@
     public function delete() {
 
       if ($this->data['code'] == settings::get('store_currency_code')) {
-        trigger_error('Cannot delete the store system currency', E_USER_ERROR);
+        trigger_error('Cannot delete the store currency', E_USER_ERROR);
         return;
       }
 

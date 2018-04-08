@@ -47,7 +47,7 @@
       );
 
       if ($manufacturer = database::fetch($manufacturers_query)) {
-        $this->data = array_intersect_key(array_merge($this->data, $manufacturer), $this->data);
+        $this->data = array_replace($this->data, array_intersect_key($manufacturer, $this->data));
       } else {
         trigger_error('Could not find manufacturer (ID: '. (int)$manufacturer_id .') in database.', E_USER_ERROR);
       }
@@ -84,6 +84,7 @@
       database::query(
         "update ". DB_TABLE_MANUFACTURERS ." set
         status = '". (int)$this->data['status'] ."',
+        featured = '". (int)$this->data['featured'] ."',
         code = '". database::input($this->data['code']) ."',
         name = '". database::input($this->data['name']) ."',
         image = '". database::input($this->data['image']) ."',

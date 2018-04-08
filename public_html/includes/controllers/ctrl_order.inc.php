@@ -92,7 +92,7 @@
       );
 
       if ($order = database::fetch($order_query)) {
-        $this->data = array_intersect_key(array_merge($this->data, $order), $this->data);
+        $this->data = array_replace($this->data, array_intersect_key($order, $this->data));
       } else {
         trigger_error('Could not find order in database (ID: '. (int)$order_id .')', E_USER_ERROR);
       }
@@ -137,10 +137,6 @@
           case 'shipping_option_id':
           case 'shipping_option_name':
             $this->data['shipping_option'][preg_replace('#^(shipping_option_)#', '', $field)] = $value;
-            break;
-
-          default:
-            $this->data[$field] = $value;
             break;
         }
       }
@@ -205,7 +201,7 @@
         if (!empty($this->data['id'])) {
           $this->data['comments'][] = array(
             'author' => 'system',
-            'text' => sprintf(language::translate('text_order_status_changed_to_s', 'Order status changed to %s'), $current_order_status['name']),
+            'text' => strtr(language::translate('text_order_status_changed_to_new_status', 'Order status changed to %new_status'), array('%new_status' => $current_order_status['name'])),
             'hidden' => 1,
           );
         }
@@ -432,17 +428,18 @@
 
         if (!empty($notify_comments)) {
 
+          $subject = '['. language::translate('title_order', 'Order') .' #'. $this->data['id'] .'] ' . language::translate('title_new_comments_added', 'New Comments Added');
+
           $message = language::translate('text_new_comments_added_to_your_order', 'New comments added to your order') . ":\r\n\r\n";
           foreach ($notify_comments as $comment) {
             $message .= language::strftime(language::$selected['format_datetime'], strtotime($comment['date_created'])) ." – ". trim($comment['text']) . "\r\n\r\n";
           }
 
-          functions::email_send(
-            '"'. settings::get('store_name') .'" <'. settings::get('store_email') .'>',
-            $this->data['customer']['email'],
-            '['. language::translate('title_order', 'Order') .' #'. $this->data['id'] .'] ' . language::translate('title_new_comments_added', 'New Comments Added'),
-            $message
-          );
+          $email = new email();
+          $email->add_recipient($this->data['customer']['email'], $this->data['customer']['firstname'] .' '. $this->data['customer']['lastname'])
+                ->set_subject($subject)
+                ->add_body($message)
+                ->send();
         }
       }
 
@@ -453,12 +450,18 @@
         }
       }
 
+      $order_modules = new mod_order();
+      $order_modules->update($this->data);
+
       cache::clear_cache('order');
-      cache::clear_cache('product');
     }
 
     public function delete() {
+
       if (empty($this->data['id'])) return;
+
+      $order_modules = new mod_order();
+      $order_modules->delete($this->data);
 
     // Empty order first..
       $this->data['items'] = array();
@@ -472,6 +475,8 @@
         where id = '". (int)$this->data['id'] ."'
         limit 1;"
       );
+
+      cache::clear_cache('order');
     }
 
     public function refresh_total() {
@@ -486,6 +491,14 @@
         $this->data['payment_due'] += ($item['price'] + $item['tax']) * $item['quantity'];
         $this->data['tax_total'] += $item['tax'] * $item['quantity'];
         $this->data['weight_total'] += weight::convert($item['weight'], $item['weight_class'], $this->data['weight_class']) * $item['quantity'];
+      }
+
+      foreach ($this->data['order_total'] as $i => $row) {
+        if ($row['module_id'] == 'ot_subtotal') {
+          $this->data['order_total'][$i]['value'] = $this->data['subtotal']['amount'];
+          $this->data['order_total'][$i]['tax'] = $this->data['subtotal']['tax'];
+          break;
+        }
       }
 
       foreach ($this->data['order_total'] as $row) {
@@ -555,7 +568,7 @@
       if (empty($this->data['items'])) return language::translate('error_order_missing_items', 'The order does not contain any items');
 
       foreach ($this->data['items'] as $item) {
-        if (!empty($item['error'])) return language::translate('error_cart_contians_errors', 'Your cart contains errors');
+        if (!empty($item['error'])) return language::translate('error_cart_contains_errors', 'Your cart contains errors');
       }
 
     // Validate customer details
@@ -568,7 +581,7 @@
         if (empty($this->data['customer']['email'])) throw new Exception(language::translate('error_missing_email', 'You must enter your email address.'));
         if (empty($this->data['customer']['phone'])) throw new Exception(language::translate('error_missing_phone', 'You must enter your phone number.'));
 
-        if (!filter_var($this->data['customer']['email'], FILTER_VALIDATE_EMAIL)) throw new Exception(language::translate('error_invalid_email_address', 'Invalid email address'));
+        if (!functions::email_validate_address($this->data['customer']['email'])) throw new Exception(language::translate('error_invalid_email_address', 'Invalid email address'));
 
         if (reference::country($this->data['customer']['country_code'])->postcode_format) {
           if (!empty($this->data['customer']['postcode'])) {
@@ -582,6 +595,19 @@
 
         if (reference::country($this->data['customer']['country_code'])->zones) {
           if (empty($this->data['customer']['zone_code']) && reference::country($this->data['customer']['country_code'])->zones) throw new Exception(language::translate('error_missing_zone', 'You must select a zone.'));
+        }
+
+        if (empty($this->data['customer']['id'])) {
+          $customer_query = database::query(
+            "select id from ". DB_TABLE_CUSTOMERS ."
+            where email = '". database::input($this->data['customer']['email']) ."'
+            and status = 0
+            limit 1;"
+          );
+
+          if (database::num_rows($customer_query)) {
+            throw new Exception(language::translate('error_customer_account_is_disabled', 'The customer account is disabled'));
+          }
         }
 
       } catch (Exception $e) {
@@ -626,10 +652,10 @@
     // Validate shipping option
       if (!empty($GLOBALS['shipping'])) {
         if (!empty($GLOBALS['shipping']->modules) && count($GLOBALS['shipping']->options()) > 0) {
-          if (empty($GLOBALS['shipping']->data['selected']['id'])) {
+          if (empty($this->data['shipping_option']['id'])) {
             return language::translate('error_no_shipping_method_selected', 'No shipping method selected');
           } else {
-            list($module_id, $option_id) = explode(':', $GLOBALS['shipping']->data['selected']['id']);
+            list($module_id, $option_id) = explode(':', $this->data['shipping_option']['id']);
             if (empty($GLOBALS['shipping']->data['options'][$module_id]['options'][$option_id])) {
               return language::translate('error_invalid_shipping_method_selected', 'Invalid shipping method selected');
             }
@@ -640,10 +666,10 @@
     // Validate payment option
       if (!empty($GLOBALS['payment'])) {
         if (!empty($GLOBALS['payment']->modules) && count($GLOBALS['payment']->options()) > 0) {
-          if (empty($GLOBALS['payment']->data['selected']['id'])) {
+          if (empty($this->data['payment_option']['id'])) {
             return language::translate('error_no_payment_method_selected', 'No payment method selected');
           } else {
-            list($module_id, $option_id) = explode(':', $GLOBALS['payment']->data['selected']['id']);
+            list($module_id, $option_id) = explode(':', $this->data['payment_option']['id']);
             if (empty($GLOBALS['payment']->data['options'][$module_id]['options'][$option_id])) {
               return language::translate('error_invalid_payment_method_selected', 'Invalid payment method selected');
             }
@@ -662,25 +688,23 @@
       return false;
     }
 
-    public function email_order_copy($email) {
+    public function email_order_copy($recipient, $language_code='') {
 
-      if (empty($email)) return;
-
-      $session_language = language::$selected['code'];
-      language::set($this->data['language_code']);
+      if (empty($recipient)) return;
+      if (empty($language_code)) $language_code = $this->data['language_code'];
 
       /*
       $action_button = '<div itemscope itemtype="https://schema.org/EmailMessage" style="display:none">' . PHP_EOL
                      . '  <div itemprop="potentialAction" itemscope itemtype="https://schema.org/ViewAction">' . PHP_EOL
                      . '    <link itemprop="target url" href="'. document::href_ilink('printable_order_copy', array('order_id' => $this->data['id'], 'checksum' => functions::general_order_public_checksum($this->data['id']))) .'" />' . PHP_EOL
-                     . '    <meta itemprop="name" content="'. htmlspecialchars(language::translate('title_view_order', 'View Order')) .'" />' . PHP_EOL
+                     . '    <meta itemprop="name" content="'. htmlspecialchars(language::translate('title_view_order', 'View Order', $language_code)) .'" />' . PHP_EOL
                      . '  </div>' . PHP_EOL
-                     . '  <meta itemprop="description" content="'. htmlspecialchars(language::translate('title_view_printable_order_copy', 'View printable order copy')) .'" />' . PHP_EOL
+                     . '  <meta itemprop="description" content="'. htmlspecialchars(language::translate('title_view_printable_order_copy', 'View printable order copy', $language_code)) .'" />' . PHP_EOL
                      . '</div>';
       */
 
       if (!empty($this->data['order_status_id'])) {
-        $order_status = reference::order_status($this->data['order_status_id'], $this->data['language_code']);
+        $order_status = reference::order_status($this->data['order_status_id'], $language_code);
       }
 
       $aliases = array(
@@ -693,14 +717,14 @@
         '%shipping_tracking_id' => !empty($this->data['shipping_tracking_id']) ? $this->data['shipping_tracking_id'] : '-',
         '%order_items' => null,
         '%payment_due' => currency::format($this->data['payment_due'], true, $this->data['currency_code'], $this->data['currency_value']),
-        '%order_copy_url' => document::ilink('printable_order_copy', array('order_id' => $this->data['id'], 'checksum' => functions::general_order_public_checksum($this->data['id']), 'media' => 'print')),
+        '%order_copy_url' => document::ilink('printable_order_copy', array('order_id' => $this->data['id'], 'checksum' => functions::general_order_public_checksum($this->data['id']), 'media' => 'print'), false, array(), $language_code),
         '%order_status' => !empty($order_status) ? $order_status->name : null,
         '%store_name' => settings::get('store_name'),
-        '%store_url' => document::ilink(''),
+        '%store_url' => document::ilink('', array(), false, array(), $language_code),
       );
 
       foreach($this->data['items'] as $item) {
-        $product = reference::product($item['product_id']);
+        $product = reference::product($item['product_id'], $language_code);
 
         $options = array();
         if (!empty($item['options'])) {
@@ -709,10 +733,12 @@
           }
         }
 
-        $aliases['%order_items'] .= (float)$item['quantity'] .' x '. $item['name'] . (!empty($options) ? ' ('. implode(', ', $options) .')' : '') . "\r\n";
+        $aliases['%order_items'] .= (float)$item['quantity'] .' x '. $product->name . (!empty($options) ? ' ('. implode(', ', $options) .')' : '') . "\r\n";
       }
 
       $aliases['%order_items'] = trim($aliases['%order_items']);
+
+      $subject = '['. language::translate('title_order', 'Order', $language_code) .' #'. $this->data['id'] .'] '. language::translate('title_order_confirmation', 'Order Confirmation', $language_code);
 
       $message = "Thank you for your purchase!\r\n\r\n"
                . "Your order #%order_id has successfully been created with a total of %payment_due for the following ordered items:\r\n\r\n"
@@ -723,20 +749,20 @@
                . "%store_name\r\n"
                . "%store_url\r\n";
 
-      $message = language::translate('email_order_confirmation', $message);
+      $message = strtr(language::translate('email_order_confirmation', $message, $language_code), $aliases);
 
-      functions::email_send(
-        null,
-        $email,
-        '['. language::translate('title_order', 'Order') .' #'. $this->data['id'] .'] '. language::translate('title_order_confirmation', 'Order Confirmation'),
-        strtr($message, $aliases),
-        false
-      );
-
-      language::set($session_language);
+      $email = new email();
+      $email->add_recipient($recipient)
+            ->set_subject($subject)
+            ->add_body($message)
+            ->send();
     }
 
     public function send_email_notification() {
+
+      if (empty($this->data['order_status_id'])) return;
+
+      $order_status = reference::order_status($this->data['order_status_id'], $this->data['language_code']);
 
       $aliases = array(
         '%order_id' => $this->data['id'],
@@ -746,52 +772,22 @@
         '%payment_transaction_id' => !empty($this->data['payment_transaction_id']) ? $this->data['payment_transaction_id'] : '-',
         '%shipping_address' => nl2br(functions::format_address($this->data['customer']['shipping_address'])),
         '%shipping_tracking_id' => !empty($this->data['shipping_tracking_id']) ? $this->data['shipping_tracking_id'] : '-',
-        '%order_copy_url' => document::ilink('printable_order_copy', array('order_id' => $this->data['id'], 'checksum' => functions::general_order_public_checksum($this->data['id']))),
+        '%order_copy_url' => document::ilink('printable_order_copy', array('order_id' => $this->data['id'], 'checksum' => functions::general_order_public_checksum($this->data['id'])), false, array(), $this->data['language_code']),
         '%order_status' => $order_status->name,
         '%store_name' => settings::get('store_name'),
-        '%store_url' => document::ilink(''),
+        '%store_url' => document::ilink('', array(), false, array(), $this->data['language_code']),
       );
 
       $subject = strtr($order_status->email_subject, $aliases);
       $message = strtr($order_status->email_message, $aliases);
 
-      if (empty($subject)) $subject = '['. language::translate('title_order', 'Order') .' #'. $this->data['id'] .'] '. $order_status->name;
-      if (empty($message)) $message = strtr(language::translate('text_order_status_changed_to_s', 'Order status changed to '), array('%s' => $order_status->name));
+      if (empty($subject)) $subject = '['. language::translate('title_order', 'Order', $this->data['language_code']) .' #'. $this->data['id'] .'] '. $order_status->name;
+      if (empty($message)) $message = strtr(language::translate('text_order_status_changed_to_new_status', 'Order status changed to %new_status', $this->data['language_code']), array('%new_status' => $order_status->name));
 
-      functions::email_send(
-        null,
-        $this->data['customer']['email'],
-        $subject,
-        $message,
-        true
-      );
-    }
-
-    public function draw_printable_copy() {
-
-      $session_language = language::$selected['code'];
-      language::set($this->data['language_code']);
-
-      $printable_order_copy = new view();
-      $printable_order_copy->snippets['order'] = $this->data;
-      $output = $printable_order_copy->stitch('pages/printable_order_copy');
-
-      language::set($session_language);
-
-      return $output;
-    }
-
-    public function draw_printable_packing_slip() {
-
-      $session_language = language::$selected['code'];
-      language::set($this->data['language_code']);
-
-      $printable_packing_slip = new view();
-      $printable_packing_slip->snippets['order'] = $this->data;
-      $output = $printable_packing_slip->stitch('pages/printable_packing_slip');
-
-      language::set($session_language);
-
-      return $output;
+      $email = new email();
+      $email->add_recipient($this->data['customer']['email'], $this->data['customer']['firstname'] .' '. $this->data['customer']['lastname'])
+            ->set_subject($subject)
+            ->add_body($message, true)
+            ->send();
     }
   }

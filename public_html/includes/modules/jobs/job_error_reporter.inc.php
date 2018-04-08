@@ -13,9 +13,16 @@
 
       if (empty($this->settings['status'])) return;
 
+      if (empty($this->settings['email_recipient'])) $this->settings['email_recipient'] = settings::get('store_email');
+
       $last_run = settings::get(__CLASS__.':last_run');
 
       if (empty($force)) {
+        if (!empty($this->settings['working_hours'])) {
+          list($from_time, $to_time) = explode('-', $this->settings['working_hours']);
+          if (time() < strtotime("Today $from_time") || time() > strtotime("Today $to_time")) return;
+        }
+
         switch ($this->settings['report_frequency']) {
           case 'Immediately':
             break;
@@ -43,15 +50,22 @@
 
       $error_log_file = ini_get('error_log');
       $contents = file_get_contents($error_log_file);
-      if (!empty($contents)) {
-        $result = functions::email_send(
-          null,
-          !empty($this->settings['email_receipient']) ? $this->settings['email_receipient'] : settings::get('store_email'),
-          '[Error Report] '. settings::get('store_name'),
-          PLATFORM_NAME .' '. PLATFORM_VERSION ."\r\n\r\n". $contents
-        );
-        if ($result === true) file_put_contents($error_log_file, '');
+
+      if (empty($contents)) {
+        echo 'Nothing to report';
+        return;
       }
+
+      echo 'Sending report to '. $this->settings['email_recipient'];
+
+      $email = new email();
+      $email->add_recipient($this->settings['email_recipient'])
+            ->set_subject('[Error Report] '. settings::get('store_name'))
+            ->add_body(PLATFORM_NAME .' '. PLATFORM_VERSION ."\r\n\r\n". $contents);
+
+      if ($email->send() !== true) return;
+
+      file_put_contents($error_log_file, '');
     }
 
     function settings() {
@@ -72,10 +86,17 @@
           'function' => 'radio("Immediately","Hourly","Daily","Weekly","Monthly")',
         ),
         array(
-          'key' => 'email_receipient',
+          'key' => 'working_hours',
+          'default_value' => '07:00-21:00',
+          'title' => language::translate(__CLASS__.':title_working_hours', 'Working Hours'),
+          'description' => language::translate(__CLASS__.':description_working_hours', 'During what hours of the day the job would operate e.g. 07:00-21:00.'),
+          'function' => 'input()',
+        ),
+        array(
+          'key' => 'email_recipient',
           'default_value' => settings::get('store_email'),
-          'title' => language::translate(__CLASS__.':title_email_receipient', 'E-mail Receipient'),
-          'description' => language::translate(__CLASS__.':description_email_receipient', 'The e-mail address where reports will be sent.'),
+          'title' => language::translate(__CLASS__.':title_email_recipient', 'Email Recipient'),
+          'description' => language::translate(__CLASS__.':description_email_recipient', 'The email address where reports will be sent.'),
           'function' => 'input()',
         ),
         array(

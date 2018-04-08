@@ -5,7 +5,14 @@
 
   $order = new ctrl_order($_GET['order_id']);
 
-  echo $order->draw_printable_packing_slip();
+  $session_language = language::$selected['code'];
+  language::set($order->data['language_code']);
 
-  require_once('../includes/app_footer.inc.php');
+  $_page = new view();
+  $_page->snippets['order'] = $order->data;
+  echo $_page->stitch('pages/printable_packing_slip');
+
+  language::set($session_language);
+
+  require_once vmod::check('../includes/app_footer.inc.php');
   exit;

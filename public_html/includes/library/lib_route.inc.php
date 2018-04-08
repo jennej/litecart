@@ -22,6 +22,7 @@
       $files = glob(FS_DIR_HTTP_ROOT . WS_DIR_ROUTES . 'url_*.inc.php');
 
       foreach($files as $file) {
+        $file = str_replace("\\", '/', $file); // Convert windows paths
         $route_name = preg_replace('#^.*/url_(.*)\.inc\.php$#', '$1', $file);
         $class_name = preg_replace('#^.*/(url_.*)\.inc\.php$#', '$1', $file);
 
@@ -45,10 +46,8 @@
     // Append default routes
       $routes = array(
         '#^(?:index\.php)?$#'                  => array('page' => 'index',          'params' => '',  'redirect' => true),
-        '#^ajax/(.*)(?:\.php)?$#'              => array('page' => 'ajax/$1',        'params' => '',  'redirect' => true),
-        '#^feeds/(.*)(?:\.php)?$#'             => array('page' => 'feeds/$1',       'params' => '',  'redirect' => true),
         '#^order_process$#'                    => array('page' => 'order_process',  'params' => '',  'redirect' => false, 'post_security' => false),
-        '#^([0-9|a-z|_]+)(?:\.php)?$#'         => array('page' => '$1',             'params' => '',  'redirect' => true),
+        '#^([0-9a-z_/\.]+)(?:\.php)?$#'        => array('page' => '$1',             'params' => '',  'redirect' => true),
         // See ~/includes/routes/ folder for more advanced routes
       );
 
@@ -63,7 +62,7 @@
       self::$request = self::strip_url_logic($_SERVER['REQUEST_URI']);
 
     // Abort mission if in admin panel
-      if (preg_match('#^'. preg_quote(WS_DIR_ADMIN, '#') .'.*#', self::$request)) return;
+      if (preg_match('#^'. preg_quote(ltrim(WS_DIR_ADMIN, '/'), '#') .'.*#', self::$request)) return;
 
     // Set target route for requested URL
       foreach (self::$_routes as $matched_pattern => $route) {
@@ -136,11 +135,11 @@
 
     public static function ilink($page=null, $new_params=array(), $inherit_params=false, $skip_params=array(), $language_code=null) {
 
-      if ($route === null) {
-        $route = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+      if ($page === null) {
+        $page = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         if ($inherit_params === null) $inherit_params = true;
       } else {
-        $route = WS_DIR_HTTP_HOME . $route;
+        $page = WS_DIR_HTTP_HOME . $route;
       }
 
       return link::create_link($page, $new_params, $inherit_params, $skip_params, $language_code);

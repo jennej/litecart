@@ -48,7 +48,7 @@
       );
 
       if ($order_status = database::fetch($order_status_query)) {
-        $this->data = array_intersect_key(array_merge($this->data, $order_status), $this->data);
+        $this->data = array_replace($this->data, array_intersect_key($order_status, $this->data));
       } else {
         trigger_error('Could not find order_status (ID: '. (int)$order_status_id .') in database.', E_USER_ERROR);
       }
@@ -79,14 +79,15 @@
 
       database::query(
         "update ". DB_TABLE_ORDER_STATUSES ."
-        set icon = '". database::input($this->data['icon']) ."',
-        color = '". database::input($this->data['color']) ."',
-        is_sale = '". (empty($this->data['is_sale']) ? '0' : '1') ."',
-        is_active = '". (empty($this->data['is_active']) ? '0' : '1') ."',
-        is_archived = '". (empty($this->data['is_archived']) ? '0' : '1') ."',
-        notify = '". (empty($this->data['notify']) ? '0' : '1') ."',
-        priority = '". (int)$this->data['priority'] ."',
-        date_updated = '". date('Y-m-d H:i:s') ."'
+        set
+          icon = '". database::input($this->data['icon']) ."',
+          color = '". database::input($this->data['color']) ."',
+          is_sale = '". (empty($this->data['is_sale']) ? '0' : '1') ."',
+          is_active = '". (empty($this->data['is_active']) ? '0' : '1') ."',
+          is_archived = '". (empty($this->data['is_archived']) ? '0' : '1') ."',
+          notify = '". (empty($this->data['notify']) ? '0' : '1') ."',
+          priority = '". (int)$this->data['priority'] ."',
+          date_updated = '". date('Y-m-d H:i:s') ."'
         where id = '". (int)$this->data['id'] ."'
         limit 1;"
       );

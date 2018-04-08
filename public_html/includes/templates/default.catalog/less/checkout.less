@@ -1,27 +1,30 @@
+// Variables
+@import "variables.less";
+
+#page {
+  padding: 0;
+}
+
 .loader-wrapper {
   position: fixed;
   top: 50%;
   left: 10%;
   right: 10%;
   text-align: center;
-
   margin-top: -128px;
   opacity: 0.1;
   z-index: 999999;
 }
 
-#header-wrapper {
-  padding: 20px;
-}
-
 #header {
   margin: 0 auto;
+  padding: @default-gutter-size;
   .customer-service {
     float: right;
     text-align: right;
-    line-height: 125%;
-    @media(min-width: 640px) {
-      font-size: 1.5em;
+    line-height: 150%;
+    @media(min-width: @media-breakpoint-sm) {
+      font-size: 1.25em;
     }
     .title {
       font-weight: bold;
@@ -61,24 +64,29 @@
     &.btn {
       padding: 12px;
     }
-    &:not(.active):not(.disabled) {
-      opacity: 0.75;
-      -webkit-transition: all 0.25s ease;
-      -moz-transition: all 0.25s ease;
-      -o-transition: all 0.25s ease;
-      transition: all 0.25s ease;
+    &:not(.active) {
       .content {
         max-height: 0;
         overflow-y: hidden;
+      }
+      &:not(.disabled) {
+        opacity: 0.75;
+        -webkit-transition: all 0.25s ease;
+        -moz-transition: all 0.25s ease;
+        -o-transition: all 0.25s ease;
+        transition: all 0.25s ease;
       }
     }
     .thumbnail {
       padding: 0 !important;
     }
+    .title {
+      margin: 0;
+    }
+    .error {
+      color: #c00;
+    }
     .content {
-      -webkit-transition: all 0.25s ease;
-      -moz-transition: all 0.25s ease;
-      -o-transition: all 0.25s ease;
       transition: all 0.25s ease;
       max-height: 200px;
       overflow-x: hidden;

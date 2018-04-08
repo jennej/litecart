@@ -16,17 +16,15 @@
   }
 
   if (empty($product->id)) {
-    notices::add('errors', language::translate('error_410_gone', 'The requested file is no longer available'));
     http_response_code(410);
-    header('Refresh: 0; url='. document::ilink(''));
-    exit;
+    echo language::translate('error_410_gone', 'The requested file is no longer available');
+    return;
   }
 
   if (empty($product->status)) {
-    notices::add('errors', language::translate('error_404_not_found', 'The requested file could not be found'));
+    echo language::translate('error_404_not_found', 'The requested file could not be found');
     http_response_code(404);
-    header('Refresh: 0; url='. document::ilink(''));
-    exit;
+    return;
   }
 
   if ($product->date_valid_from > date('Y-m-d H:i:s')) {
@@ -90,6 +88,9 @@
   $schema_json = array(
     '@context' => 'http://schema.org/',
     '@type' => 'Product',
+    'productID' => $product->id,
+    'sku' => $product->sku,
+    'gtin14' => $product->gtin,
     'name' => $product->name,
     'image' => document::link(!empty($product->images) ? WS_DIR_IMAGES . @array_shift(array_values($product->images)) : WS_DIR_IMAGES . 'no_image.png'),
     'description' => !empty($product->description) ? strip_tags($product->description) : '',
@@ -111,6 +112,7 @@
     'link' => document::ilink('product', array(), true),
     'code' => $product->code,
     'sku' => $product->sku,
+    'mpn' => $product->mpn,
     'gtin' => $product->gtin,
     'name' => $product->name,
     'short_description' => !empty($product->short_description) ? $product->short_description : '',
@@ -118,7 +120,7 @@
     'head_title' => !empty($product->head_title) ? $product->head_title : $product->name,
     'meta_description' => !empty($product->meta_description) ? $product->meta_description : $product->short_description,
     'keywords' => $product->keywords,
-    'attributes' => !empty($product->attributes[language::$selected['code']]) ? mb_split('(\r|\n)+', $product->attributes[language::$selected['code']]) : array(),
+    'attributes' => !empty($product->attributes) ? preg_split('#\r\n|\r|\n#', $product->attributes) : array(),
     'image' => array(
       'original' => !empty($product->images) ? WS_DIR_IMAGES . @array_shift(array_values($product->images)) : WS_DIR_IMAGES . 'no_image.png',
       'thumbnail' => functions::image_thumbnail(FS_DIR_HTTP_ROOT . WS_DIR_IMAGES . @array_shift(array_values($product->images)), $width, $height, settings::get('product_image_clipping'), settings::get('product_image_trim')),
@@ -234,14 +236,11 @@
       customer::$data
     );
     if (!empty($cheapest_shipping)) {
-      $_page->snippets['cheapest_shipping'] = null;
       list($module_id, $option_id) = explode(':', $cheapest_shipping);
       if (empty($shipping->data['options'][$module_id]['options'][$option_id]['error'])) {
         $shipping_cost = $shipping->data['options'][$module_id]['options'][$option_id]['cost'];
         $shipping_tax_class_id = $shipping->data['options'][$module_id]['options'][$option_id]['tax_class_id'];
-        $_page->snippets['cheapest_shipping'] = strtr(language::translate('text_cheapest_shipping_from_price', 'Cheapest shipping from %price'), array(
-          '%price' => currency::format(tax::get_price($shipping_cost, $shipping_tax_class_id)),
-        ));
+        $_page->snippets['cheapest_shipping_fee'] = tax::get_price($shipping_cost, $shipping_tax_class_id);
       }
     }
   }
@@ -266,15 +265,14 @@
             }
 
             $values .= '<div class="checkbox">' . PHP_EOL
-                     . '  <label>' . functions::form_draw_checkbox('options['.$group['name'].'][]', $value['name'], true, 'data-price-adjust="'. (float)$price_adjust .'" data-tax-adjust="'. (float)$tax_adjust .'"' . (!empty($group['required']) ? 'required="required"' : '')) .' '. $value['name'] . $price_adjust_text . '</label>' . PHP_EOL
+                     . '  <label>' . functions::form_draw_checkbox('options['.$group['name'].'][]', $value['name'], true, 'data-price-adjust="'. (float)$price_adjust .'" data-tax-adjust="'. (float)$tax_adjust .'"' . (!empty($group['required']) ? ' required="required"' : '')) .' '. $value['name'] . $price_adjust_text . '</label>' . PHP_EOL
                      . '</div>';
           }
           break;
 
         case 'input':
 
-          $value_ids = array_keys($group['values']);
-          $value_id = array_shift($value_ids);
+          $value = array_shift($group['values']);
 
           $price_adjust_text = '';
           $price_adjust = currency::format_raw(tax::get_price($value['price_adjust'], $product->tax_class_id));
@@ -285,7 +283,7 @@
             if ($value['price_adjust'] > 0) $price_adjust_text = ' +'.$price_adjust_text;
           }
 
-          $values .= functions::form_draw_text_field('options['.$group['name'].']', isset($_POST['options'][$group['name']]) ? true : $value['value'], 'data-price-adjust="'. (float)$price_adjust .'" data-tax-adjust="'. (float)$tax_adjust .'"' . (!empty($group['required']) ? 'required="required"' : '')) . $price_adjust_text . PHP_EOL;
+          $values .= functions::form_draw_text_field('options['.$group['name'].']', isset($_POST['options'][$group['name']]) ? true : $value['value'], 'data-price-adjust="'. (float)$price_adjust .'" data-tax-adjust="'. (float)$tax_adjust .'"' . (!empty($group['required']) ? ' required="required"' : '')) . $price_adjust_text . PHP_EOL;
           break;
 
         case 'radio':
@@ -294,7 +292,7 @@
 
             $price_adjust_text = '';
             $price_adjust = currency::format_raw(tax::get_price($value['price_adjust'], $product->tax_class_id));
-            $tax_adjust = currency::format(tax::get_price($value['price_adjust'], $product->tax_class_id));
+            $tax_adjust = currency::format(tax::get_tax($value['price_adjust'], $product->tax_class_id));
 
             if ($value['price_adjust']) {
               $price_adjust_text = currency::format(tax::get_price($value['price_adjust'], $product->tax_class_id));
@@ -302,7 +300,7 @@
             }
 
             $values .= '<div class="radio">' . PHP_EOL
-                     . '  <label>'. functions::form_draw_radio_button('options['.$group['name'].']', $value['name'], true, 'data-price-adjust="'. (float)$price_adjust .'" data-tax-adjust="'. (float)$tax_adjust .'"' . (!empty($group['required']) ? 'required="required"' : '')) .' '. $value['name'] . $price_adjust_text . '</label>' . PHP_EOL
+                     . '  <label>'. functions::form_draw_radio_button('options['.$group['name'].']', $value['name'], true, 'data-price-adjust="'. (float)$price_adjust .'" data-tax-adjust="'. (float)$tax_adjust .'"' . (!empty($group['required']) ? ' required="required"' : '')) .' '. $value['name'] . $price_adjust_text . '</label>' . PHP_EOL
                      . '</div>';
           }
           break;
@@ -329,8 +327,7 @@
 
         case 'textarea':
 
-          $value_ids = array_keys($group['values']);
-          $value_id = array_shift($value_ids);
+          $value = array_shift($group['values']);
 
           $price_adjust_text = '';
           $price_adjust = currency::format_raw(tax::get_price($value['price_adjust'], $product->tax_class_id));

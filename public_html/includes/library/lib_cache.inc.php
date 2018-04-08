@@ -102,7 +102,7 @@
             $data = @json_decode(file_get_contents($cache_file), true);
 
             if (strtolower(language::$selected['charset']) != 'utf-8') {
-              mb_convert_variables(language::$selected['charset'], 'UTF-8', $data);
+              $data = language::convert_characters($data, 'UTF-8', language::$selected['charset']);
             }
 
             return $data;
@@ -135,7 +135,7 @@
           $cache_file = FS_DIR_HTTP_ROOT . WS_DIR_CACHE . '_cache_' . $cache_id;
 
           if (strtolower(language::$selected['charset']) != 'utf-8') {
-            mb_convert_variables('UTF-8', language::$selected['charset'], $data);
+            $data = language::convert_characters($data, language::$selected['charset'], 'UTF-8');
           }
 
           return @file_put_contents($cache_file, json_encode($data));
@@ -188,8 +188,8 @@
       $dependencies = array_unique($dependencies);
       sort($dependencies);
 
-      foreach ($dependencies as $dependant) {
-        switch ($dependant) {
+      foreach ($dependencies as $dependency) {
+        switch ($dependency) {
           case 'basename':
             $hash_string .= $_SERVER['PHP_SELF'];
             break;
@@ -202,6 +202,9 @@
           case 'domain':
           case 'host':
             $hash_string .= $_SERVER['HTTP_HOST'];
+            break;
+          case 'endpoint':
+            $hash_string .= preg_match('#^'. preg_quote(ltrim(WS_DIR_ADMIN, '/'), '#') .'.*#', route::$request) ? 'backend' : 'frontend';
             break;
           case 'get':
             $hash_string .= serialize($_GET);
@@ -237,10 +240,7 @@
             $hash_string .= $_SERVER['REQUEST_URI'];
             break;
           default:
-            if (is_array($dependant)) {
-              $hash_string .= $dependant;
-            }
-            $hash_string .= $dependant;
+            $hash_string .= is_array($dependency) ? implode('', $dependency) : $dependency;
             break;
         }
       }

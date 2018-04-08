@@ -12,13 +12,10 @@
   if ($_GET['date_from'] > date('Y-m-d H:i:s')) $_GET['date_from'] = date('Y-m-d H:i:s');
   if ($_GET['date_to'] > date('Y-m-d H:i:s')) $_GET['date_to'] = date('Y-m-d H:i:s');
 
-  if (!isset($_GET['page'])) $_GET['page'] = 1;
+  if (empty($_GET['page']) || !is_numeric($_GET['page'])) $_GET['page'] = 1;
 ?>
 
 <style>
-.border-left {
-  border-left: 1px #999 dashed;
-}
 form[name="filter_form"] li {
   vertical-align: middle;
 }
@@ -31,9 +28,9 @@ form[name="filter_form"] li {
     <li> <?php echo functions::form_draw_search_field('name', true, 'placeholder="'. htmlspecialchars(language::translate('title_item_name', 'Item Name')) .'"'); ?></li>
     <li>
       <div class="input-group" style="max-width: 350px;">
-        <?php echo functions::form_draw_date_field('date_from'); ?>
+        <?php echo functions::form_draw_date_field('date_from', true); ?>
         <span class="input-group-addon"> - </span>
-        <?php echo functions::form_draw_date_field('date_to'); ?>
+        <?php echo functions::form_draw_date_field('date_to', true); ?>
       </div>
     </li>
     <li><?php echo functions::form_draw_button('filter', language::translate('title_filter_now', 'Filter')); ?></li>

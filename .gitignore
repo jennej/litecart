@@ -1,30 +1,39 @@
-#################
-# Project files #
-#################
-node_modules/
-public_html/includes/config.inc.php
-public_html/data/backups/*
+#####################
+# Application Files #
+#####################
+
 public_html/cache/*
+public_html/data/*
+public_html/images/*
+public_html/logs/*
 public_html/vqmod/vqcache/*
 public_html/vqmod/xml/*
 
+!public_html/**/index.html
+!public_html/**/.htaccess
+
+public_html/admin/.htaccess
+public_html/admin/.htpasswd
+public_html/includes/config.inc.php
+public_html/.htaccess
+public_html/favicon.ico
+public_html/robots.txt
+
+#################
+# Project files #
+#################
+
+node_modules/
+
 *.bak
-*.000
-*.001
-*.002
-*.003
-*.004
-*.005
-*.006
-*.007
-*.008
-*.009
 *.old
 *.ignore
+*.cmd
 
 ######################
 # OS generated files #
 ######################
+
 .DS_Store
 .DS_Store?
 ._.DS_Store

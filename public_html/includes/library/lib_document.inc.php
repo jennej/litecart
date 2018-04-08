@@ -35,21 +35,20 @@
       self::$snippets['language'] = language::$selected['code'];
       self::$snippets['charset'] = language::$selected['charset'];
       self::$snippets['home_path'] = WS_DIR_HTTP_HOME;
-      self::$snippets['template_path'] = WS_DIR_TEMPLATES . self::$template .'/';
+      self::$snippets['template_path'] = WS_DIR_TEMPLATE;
 
       self::$snippets['title'] = array(settings::get('store_name'));
 
       self::$snippets['head_tags']['favicon'] = '<link rel="shortcut icon" href="'. WS_DIR_HTTP_HOME .'favicon.ico">' . PHP_EOL;
 
-
     // CDN content
       //self::$snippets['head_tags']['dns-prefetch-jsdelivr'] = '<link rel="dns-prefetch" href="//cdn.jsdelivr.net">';
       //self::$snippets['head_tags']['fontawesome'] = '<link rel="stylesheet" href="//cdn.jsdelivr.net/fontawesome/latest/css/font-awesome.min.css" />';
-      //self::$snippets['foot_tags']['jquery'] = '<script src="//cdn.jsdelivr.net/g/jquery@3.2.0"></script>';
+      //self::$snippets['foot_tags']['jquery'] = '<script src="//cdn.jsdelivr.net/g/jquery@3.3.1"></script>';
 
     // Local content
       self::$snippets['head_tags']['fontawesome'] = '<link rel="stylesheet" href="'. WS_DIR_EXT .'fontawesome/css/font-awesome.min.css" />';
-      self::$snippets['foot_tags']['jquery'] = '<script src="'. WS_DIR_EXT .'jquery/jquery-3.2.0.min.js"></script>';
+      self::$snippets['foot_tags']['jquery'] = '<script src="'. WS_DIR_EXT .'jquery/jquery-3.3.1.min.js"></script>';
 
     // Hreflang
       if (!empty(route::$route['page']) && settings::get('seo_links_language_prefix')) {
@@ -72,6 +71,10 @@
       $config = array(
         'platform' => array(
           'url' => document::ilink(''),
+        ),
+        'session' => array(
+          'language_code' => language::$selected['code'],
+          'currency_code' => currency::$selected['code'],
         ),
         'template' => array(
           'url' => document::link(WS_DIR_TEMPLATE),
@@ -208,9 +211,7 @@
           if (!empty($javascript)) {
             $javascript = '<script>' . PHP_EOL
                         . '<!--/*--><![CDATA[/*><!--*/' . PHP_EOL
-                        . '$(document).ready(function(){' . PHP_EOL
                         . implode(PHP_EOL . PHP_EOL, $javascript) . PHP_EOL
-                        . '});' . PHP_EOL
                         . '/*]]>*/-->' . PHP_EOL
                         . '</script>' . PHP_EOL;
 

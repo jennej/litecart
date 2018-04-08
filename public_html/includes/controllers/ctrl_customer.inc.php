@@ -41,26 +41,22 @@
       );
 
       if ($customer = database::fetch($customer_query)) {
-        $this->data = array_intersect_key(array_merge($this->data, $customer), $this->data);
+        $this->data = array_replace($this->data, array_intersect_key($customer, $this->data));
       } else {
         trigger_error('Could not find customer (ID: '. (int)$customer_id .') in database.', E_USER_ERROR);
       }
 
-      $key_map = array(
-        'shipping_company' => 'company',
-        'shipping_firstname' => 'firstname',
-        'shipping_lastname' => 'lastname',
-        'shipping_address1' => 'address1',
-        'shipping_address2' => 'address2',
-        'shipping_postcode' => 'postcode',
-        'shipping_city' => 'city',
-        'shipping_country_code' => 'country_code',
-        'shipping_zone_code' => 'zone_code',
-        'shipping_phone' => 'phone',
-      );
+      foreach ($customer as $field => $value) {
+        if (preg_match('#^shipping_(.*)$#', $field, $matches)) {
+          unset($this->data['shipping_'.$matches[1]]);
+          $this->data['shipping_address'][$matches[1]] = $value;
+        }
+      }
 
-      foreach ($key_map as $skey => $tkey) {
-        $this->data['shipping_address'][$tkey] = $customer[$skey];
+      if (empty($this->data['different_shipping_address'])) {
+        foreach (array_keys($this->data['shipping_address']) as $key) {
+          $this->data['shipping_address'][$key] = $this->data[$key];
+        }
       }
     }
 
@@ -149,10 +145,19 @@
     public function delete() {
 
       database::query(
+        "update ". DB_TABLE_ORDERS ."
+        set customer_id = 0
+        where customer_id = '". (int)$this->data['id'] ."';"
+      );
+
+      database::query(
         "delete from ". DB_TABLE_CUSTOMERS ."
         where id = '". (int)$this->data['id'] ."'
         limit 1;"
       );
+
+      $customer_modules = new mod_customer();
+      $customer_modules->delete($this->data);
 
       cache::clear_cache('customers');
 

@@ -5,17 +5,19 @@
     private $_id;
     private $_currency_code;
     private $_language_codes;
+    private $_customer_id;
     private $_data = array();
 
-    function __construct($product_id, $language_code=null, $currency_code=null) {
+    function __construct($product_id, $language_code=null, $currency_code=null, $customer_id=null) {
 
       $this->_id = (int)$product_id;
-      $this->_currency_code = !empty($currency_code) ? $currency_code : currency::$selected['code'];
       $this->_language_codes = array_unique(array(
         !empty($language_code) ? $language_code : language::$selected['code'],
         settings::get('default_language_code'),
         settings::get('store_language_code'),
       ));
+      $this->_currency_code = !empty($currency_code) ? $currency_code : currency::$selected['code'];
+      $this->_customer_id = !empty($customer_id) ? $customer_id : customer::$data['id'];
     }
 
     public function &__get($name) {
@@ -47,23 +49,23 @@
           $this->_data['also_purchased_products'] = array();
 
             $query = database::query(
-              "select product_id, sum(quantity) as total_quantity from ". DB_TABLE_ORDERS_ITEMS ."
-              where (product_id != ". (int)$this->_id ." and product_id not like '". database::input($this->_id) .":%')
+              "select oi.product_id, sum(oi.quantity) as total_quantity from ". DB_TABLE_ORDERS_ITEMS ." oi
+              left join ". DB_TABLE_PRODUCTS ." p on (p.id = oi.product_id)
+              where p.status
+              and (oi.product_id != 0 and oi.product_id != ". (int)$this->_id .")
               and order_id in (
                 select distinct order_id as id from ". DB_TABLE_ORDERS_ITEMS ."
-                where (product_id = ". (int)$this->_id ." or product_id like '". database::input($this->_id) .":%')
+                where product_id = ". (int)$this->_id ."
               )
-              group by product_id
+              group by oi.product_id
               order by total_quantity desc;"
             );
 
             while ($row = database::fetch($query)) {
-              $product_id = preg_replace('#^[0-9]+(:.*)?$#', '', $row['product_id']);
               $this->_data['also_purchased_products'][$row['product_id']] = reference::product($row['product_id']);
             }
 
           break;
-
 
         case 'name':
         case 'short_description':
@@ -405,30 +407,24 @@
               list($group_id, $value_id) = explode('-', $pair);
 
               $query = database::query(
-                "select * from ". DB_TABLE_PRODUCT_GROUPS_INFO ."
+                "select name from ". DB_TABLE_PRODUCT_GROUPS_INFO ."
                 where product_group_id = '". (int)$group_id ."'
                 and language_code in ('". implode("', '", database::input($this->_language_codes)) ."')
                 order by field(language_code, '". implode("', '", database::input($this->_language_codes)) ."');"
               );
 
               while ($row = database::fetch($query)) {
-                foreach ($option_value_info as $key => $value) {
-                  if (in_array($key, array('id', 'product_group_id', 'language_code'))) continue;
-                  if (empty($this->_data['product_groups'][$group_id][$key])) $this->_data['product_groups'][$group_id][$key] = $value;
-                }
+                if (empty($this->_data['product_groups'][$pair]['group'])) $this->_data['product_groups'][$pair]['group'] = $row['name'];
               }
 
               $query = database::query(
-                "select * from ". DB_TABLE_PRODUCT_GROUPS_VALUES_INFO ."
+                "select name from ". DB_TABLE_PRODUCT_GROUPS_VALUES_INFO ."
                 where product_group_value_id = '". (int)$value_id ."'
                 and language_code in ('". implode("', '", database::input($this->_language_codes)) ."')
                 order by field(language_code, '". implode("', '", database::input($this->_language_codes)) ."');"
               );
               while ($row = database::fetch($query)) {
-                foreach ($row as $key => $value) {
-                  if (in_array($key, array('id', 'product_group_value_id', 'language_code'))) continue;
-                  if (empty($this->_data['product_groups'][$group_id]['values'][$value_id])) $this->_data['product_groups'][$group_id]['values'][$value_id] = $value;
-                }
+                if (empty($this->_data['product_groups'][$pair]['value'])) $this->_data['product_groups'][$pair]['value'] = $row['name'];
               }
             }
           }
@@ -512,11 +508,11 @@
           foreach ($row as $key => $value) {
             switch($key) {
               case 'product_groups':
-                $row['product_group_ids'] = explode(',', $row['product_groups']);
+                $this->_data['product_group_ids'] = explode(',', $row['product_groups']);
                 break;
 
               case 'keywords':
-                $row[$key] = explode(',', $row[$key]);
+                $this->_data[$key] = explode(',', $row[$key]);
                 break;
 
               default:

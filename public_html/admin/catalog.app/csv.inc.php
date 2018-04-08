@@ -1,10 +1,9 @@
 <?php
 
-  if (!empty($_POST['export_categories'])) {
+  if (isset($_POST['export_categories'])) {
 
-    if (empty($_POST['language_code'])) notices::add('errors', language::translate('error_must_select_a_language', 'You must select a language'));
-
-    if (empty(notices::$data['errors'])) {
+    try {
+      if (empty($_POST['language_code'])) throw new Exception(language::translate('error_must_select_a_language', 'You must select a language'));
 
       $csv = array();
 
@@ -14,6 +13,7 @@
 
         $csv[] = array(
           'id' => $category->id,
+          'status' => $category->status,
           'parent_id' => $category->parent_id,
           'code' => $category->code,
           'name' => $category->name,
@@ -24,7 +24,6 @@
           'head_title' => $category->head_title,
           'h1_title' => $category->h1_title,
           'image' => $category->image,
-          'status' => $category->status,
           'priority' => $category->priority,
           'language_code' => $_POST['language_code'],
         );
@@ -53,12 +52,18 @@
       }
 
       exit;
+
+    } catch (Exception $e) {
+      notices::add('errors', $e->getMessage());
     }
   }
 
-  if (!empty($_POST['import_categories'])) {
+  if (isset($_POST['import_categories'])) {
 
-    if (isset($_FILES['file']['tmp_name']) && is_uploaded_file($_FILES['file']['tmp_name'])) {
+    try {
+      if (!isset($_FILES['file']['tmp_name']) || !is_uploaded_file($_FILES['file']['tmp_name'])) {
+        throw new Exception(language::translate('error_must_select_file_to_upload', 'You must select a file to upload'));
+      }
 
       ob_clean();
 
@@ -154,14 +159,17 @@
       }
 
       exit;
+
+    } catch (Exception $e) {
+      notices::add('errors', $e->getMessage());
     }
   }
 
-  if (!empty($_POST['export_products'])) {
+  if (isset($_POST['export_products'])) {
 
-    if (empty($_POST['language_code'])) notices::add('errors', language::translate('error_must_select_a_language', 'You must select a language'));
+    try {
 
-    if (empty(notices::$data['errors'])) {
+      if (empty($_POST['language_code'])) throw new Exception(language::translate('error_must_select_a_language', 'You must select a language'));
 
       $csv = array();
 
@@ -170,16 +178,20 @@
         left join ". DB_TABLE_PRODUCTS_INFO ." pi on (pi.product_id = p.id and pi.language_code = '". database::input($_POST['language_code']) ."')
         order by pi.name;"
       );
+
       while ($product = database::fetch($products_query)) {
         $product = new ref_product($product['id'], $_POST['language_code'], $_POST['currency_code']);
 
         $csv[] = array(
           'id' => $product->id,
-          'categories' => implode(',', array_keys($product->categories)),
-          'manufacturer_id' => $product->manufacturer_id,
           'status' => $product->status,
+          'categories' => implode(',', array_keys($product->categories)),
+          'product_groups' => implode(',', array_keys($product->product_groups)),
+          'manufacturer_id' => $product->manufacturer_id,
+          'supplier_id' => $product->supplier_id,
           'code' => $product->code,
           'sku' => $product->sku,
+          'mpn' => $product->mpn,
           'gtin' => $product->gtin,
           'taric' => $product->taric,
           'name' => $product->name,
@@ -230,12 +242,19 @@
       }
 
       exit;
+
+    } catch (Exception $e) {
+      notices::add('errors', $e->getMessage());
     }
   }
 
-  if (!empty($_POST['import_products'])) {
+  if (isset($_POST['import_products'])) {
 
-    if (isset($_FILES['file']['tmp_name']) && is_uploaded_file($_FILES['file']['tmp_name'])) {
+    try {
+
+      if (!isset($_FILES['file']['tmp_name']) || !is_uploaded_file($_FILES['file']['tmp_name'])) {
+        throw new Exception(language::translate('error_must_select_file_to_upload', 'You must select a file to upload'));
+      }
 
       ob_clean();
 
@@ -293,6 +312,19 @@
             echo 'Creating new product: '. $row['name'] . PHP_EOL;
           }
 
+        } elseif (!empty($row['mpn'])) {
+          if ($product = database::fetch(database::query("select id from ". DB_TABLE_PRODUCTS ." where mpn = '". database::input($row['mpn']) ."' limit 1;"))) {
+            $product = new ctrl_product($product['id']);
+            echo "Updating existing product ". (!empty($row['name']) ? $row['name'] : "on line $line") ."\r\n";
+          } else {
+            if (empty($_POST['insert_products'])) {
+              echo "[Skipped] New product on line $line was not inserted to database.\r\n";
+              continue;
+            }
+            $product = new ctrl_product();
+            echo 'Creating new product: '. $row['name'] . PHP_EOL;
+          }
+
         } elseif (!empty($row['gtin'])) {
           if ($product = database::fetch(database::query("select id from ". DB_TABLE_PRODUCTS ." where gtin = '". database::input($row['gtin']) ."' limit 1;"))) {
             $product = new ctrl_product($product['id']);
@@ -323,7 +355,6 @@
           continue;
         }
 
-      // Append manufacturer id
         if (empty($row['manufacturer_id']) && !empty($row['manufacturer_name'])) {
           $manufacturers_query = database::query(
             "select * from ". DB_TABLE_MANUFACTURERS ."
@@ -340,16 +371,32 @@
           }
         }
 
+        if (empty($row['supplier_id']) && !empty($row['supplier_id'])) {
+          $suppliers_query = database::query(
+            "select * from ". DB_TABLE_SUPPLIERS ."
+            where name = '". database::input($row['supplier_name']) ."'
+            limit 1;"
+          );
+          if ($supplier = database::fetch($suppliers_query)) {
+            $row['supplier_id'] = $supplier['id'];
+          } else {
+            $supplier = new ctrl_supplier();
+            $supplier->data['name'] = $row['supplier_name'];
+            $supplier->save();
+            $row['supplier_id'] = $supplier->data['id'];
+          }
+        }
+
         $fields = array(
-          'categories',
-          'manufacturer_id',
           'status',
+          'manufacturer_id',
+          'supplier_id',
           'code',
           'sku',
+          'mpn',
           'gtin',
           'taric',
           'tax_class_id',
-          'keywords',
           'quantity',
           'quantity_unit_id',
           'weight',
@@ -367,7 +414,9 @@
           if (isset($row[$field])) $product->data[$field] = $row[$field];
         }
 
-        if (isset($row['categories'])) $product->data['categories'] = explode(',', str_replace(' ', '', $product->data['categories']));
+        if (isset($row['keywords'])) $product->data['keywords'] = preg_split('#, ?#', $row['keywords']);
+        if (isset($row['categories'])) $product->data['categories'] = preg_split('#, ?#', $row['categories']);
+        if (isset($row['product_groups'])) $product->data['product_groups'] = preg_split('#, ?#', $row['product_groups']);
 
       // Set price
         if (!empty($row['currency_code'])) {
@@ -424,6 +473,9 @@
       }
 
       exit;
+
+    } catch (Exception $e) {
+      notices::add('errors', $e->getMessage());
     }
   }
 
@@ -464,7 +516,7 @@
 
             <div class="form-group">
               <label><?php echo language::translate('title_charset', 'Charset'); ?></label>
-              <?php echo functions::form_draw_select_field('charset', array(array('UTF-8'), array('ISO-8859-1')), true, false); ?>
+              <?php echo functions::form_draw_encodings_list('charset', !empty($_POST['charset']) ? true : 'UTF-8', false); ?>
             </div>
 
             <div class="form-group">
@@ -505,7 +557,7 @@
 
             <div class="form-group">
               <label><?php echo language::translate('title_charset', 'Charset'); ?></label>
-              <?php echo functions::form_draw_select_field('charset', array(array('UTF-8'), array('ISO-8859-1')), true, false); ?>
+              <?php echo functions::form_draw_encodings_list('charset', !empty($_POST['charset']) ? true : 'UTF-8', false); ?>
             </div>
 
             <div class="form-group">
@@ -539,12 +591,12 @@
 
             <div class="form-group">
               <label><?php echo language::translate('title_csv_file', 'CSV File'); ?></label>
-                <?php echo functions::form_draw_file_field('file'); ?>
+              <?php echo functions::form_draw_file_field('file'); ?>
             </div>
 
             <div class="form-group">
               <label><?php echo language::translate('title_delimiter', 'Delimiter'); ?></label>
-                <?php echo functions::form_draw_select_field('delimiter', array(array(language::translate('title_auto', 'Auto') .' ('. language::translate('text_default', 'default') .')', ''), array(','),  array(';'), array('TAB', "\t"), array('|')), true, false); ?>
+              <?php echo functions::form_draw_select_field('delimiter', array(array(language::translate('title_auto', 'Auto') .' ('. language::translate('text_default', 'default') .')', ''), array(','),  array(';'), array('TAB', "\t"), array('|')), true, false); ?>
             </div>
 
             <div class="form-group">
@@ -559,7 +611,7 @@
 
             <div class="form-group">
               <label><?php echo language::translate('title_charset', 'Charset'); ?></label>
-                <?php echo functions::form_draw_select_field('charset', array(array('UTF-8'), array('ISO-8859-1')), true, false); ?>
+              <?php echo functions::form_draw_encodings_list('charset', !empty($_POST['charset']) ? true : 'UTF-8', false); ?>
             </div>
 
             <div class="form-group">
@@ -580,42 +632,42 @@
 
             <div class="form-group">
               <label><?php echo language::translate('title_language', 'Language'); ?></label>
-                <?php echo functions::form_draw_languages_list('language_code', true, false); ?>
+              <?php echo functions::form_draw_languages_list('language_code', true, false); ?>
             </div>
 
             <div class="form-group">
               <label><?php echo language::translate('title_currency', 'Currency'); ?></label>
-                <?php echo functions::form_draw_currencies_list('currency_code', true, false); ?>
+              <?php echo functions::form_draw_currencies_list('currency_code', true, false); ?>
             </div>
 
             <div class="form-group">
               <label><?php echo language::translate('title_delimiter', 'Delimiter'); ?></label>
-                <?php echo functions::form_draw_select_field('delimiter', array(array(', ('. language::translate('text_default', 'default') .')', ','), array(';'), array('TAB', "\t"), array('|')), true, false); ?>
+              <?php echo functions::form_draw_select_field('delimiter', array(array(', ('. language::translate('text_default', 'default') .')', ','), array(';'), array('TAB', "\t"), array('|')), true, false); ?>
             </div>
 
             <div class="form-group">
               <label><?php echo language::translate('title_enclosure', 'Enclosure'); ?></label>
-                <?php echo functions::form_draw_select_field('enclosure', array(array('" ('. language::translate('text_default', 'default') .')', '"')), true, false); ?>
+              <?php echo functions::form_draw_select_field('enclosure', array(array('" ('. language::translate('text_default', 'default') .')', '"')), true, false); ?>
             </div>
 
             <div class="form-group">
               <label><?php echo language::translate('title_escape_character', 'Escape Character'); ?></label>
-                <?php echo functions::form_draw_select_field('escapechar', array(array('" ('. language::translate('text_default', 'default') .')', '"'), array('\\', '\\')), true, false); ?>
+              <?php echo functions::form_draw_select_field('escapechar', array(array('" ('. language::translate('text_default', 'default') .')', '"'), array('\\', '\\')), true, false); ?>
             </div>
 
             <div class="form-group">
               <label><?php echo language::translate('title_charset', 'Charset'); ?></label>
-                <?php echo functions::form_draw_select_field('charset', array(array('UTF-8'), array('ISO-8859-1')), true, false); ?>
+              <?php echo functions::form_draw_encodings_list('charset', !empty($_POST['charset']) ? true : 'UTF-8', false); ?>
             </div>
 
             <div class="form-group">
               <label><?php echo language::translate('title_line_ending', 'Line Ending'); ?></label>
-                <?php echo functions::form_draw_select_field('eol', array(array('Win'), array('Mac'), array('Linux')), true, false); ?>
+              <?php echo functions::form_draw_select_field('eol', array(array('Win'), array('Mac'), array('Linux')), true, false); ?>
             </div>
 
             <div class="form-group">
               <label><?php echo language::translate('title_output', 'Output'); ?></label>
-                <?php echo functions::form_draw_select_field('output', array(array(language::translate('title_file', 'File'), 'file'), array(language::translate('title_screen', 'Screen'), 'screen')), true, false); ?>
+              <?php echo functions::form_draw_select_field('output', array(array(language::translate('title_file', 'File'), 'file'), array(language::translate('title_screen', 'Screen'), 'screen')), true, false); ?>
             </div>
 
             <?php echo functions::form_draw_button('export_products', language::translate('title_export', 'Export'), 'submit'); ?>

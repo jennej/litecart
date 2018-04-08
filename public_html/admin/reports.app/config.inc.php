@@ -4,7 +4,7 @@
     'name' => language::translate('title_reports', 'Reports'),
     'default' => 'open_orders',
     'theme' => array(
-      'color' => '#b79d82',
+      'color' => '#a17b54',
       'icon' => 'fa-pie-chart',
     ),
     'menu' => array(

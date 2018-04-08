@@ -1,8 +1,11 @@
 <?php
 
-  if (!empty($_POST['import'])) {
+  if (isset($_POST['import'])) {
 
-    if (isset($_FILES['file']['tmp_name']) && is_uploaded_file($_FILES['file']['tmp_name'])) {
+    try {
+      if (!isset($_FILES['file']['tmp_name']) || !is_uploaded_file($_FILES['file']['tmp_name'])) {
+        throw new Exception(language::translate('error_must_select_file_to_upload', 'You must select a file to upload'));
+      }
 
       $csv = file_get_contents($_FILES['file']['tmp_name']);
 
@@ -63,14 +66,16 @@
 
       header('Location: '. document::link('', array('app' => $_GET['app'], 'doc' => $_GET['doc'])));
       exit;
+
+    } catch (Exception $e) {
+      notices::add('errors', $e->getMessage());
     }
   }
 
-  if (!empty($_POST['export'])) {
+  if (isset($_POST['export'])) {
 
-    if (empty($_POST['language_codes'])) notices::add('errors', language::translate('error_must_select_at_least_one_language', 'You must select at least one language'));
-
-    if (empty(notices::$data['errors'])) {
+    try {
+      if (empty($_POST['language_codes'])) throw new Exception(language::translate('error_must_select_at_least_one_language', 'You must select at least one language'));
 
       $csv = array();
 
@@ -114,6 +119,9 @@
       }
 
       exit;
+
+    } catch (Exception $e) {
+      notices::add('errors', $e->getMessage());
     }
   }
 
@@ -152,12 +160,12 @@
 
         <div class="form-group">
           <label><?php echo language::translate('title_charset', 'Charset'); ?></label>
-          <?php echo functions::form_draw_select_field('charset', array(array('UTF-8'), array('ISO-8859-1')), true, false); ?>
+          <?php echo functions::form_draw_encodings_list('charset', !empty($_POST['charset']) ? true : 'UTF-8', false); ?>
         </div>
 
         <div class="form-group">
-          <label class="checkbox"><?php echo functions::form_draw_checkbox('insert', '1', isset($_POST['insert']) ? $_POST['insert'] : '1'); ?> <?php echo language::translate('text_insert_new_entries', 'Insert new entries'); ?></label><br />
-          <label class="checkbox"><?php echo functions::form_draw_checkbox('overwrite', '1', isset($_POST['insert']) ? $_POST['insert'] : ''); ?> <?php echo language::translate('text_overwrite_existing_entries', 'Overwrite existing entries'); ?></label>
+          <div class="checkbox"><label><?php echo functions::form_draw_checkbox('insert', '1', isset($_POST['insert']) ? true : '1'); ?> <?php echo language::translate('text_insert_new_entries', 'Insert new entries'); ?></label></div>
+          <div class="checkbox"><label><?php echo functions::form_draw_checkbox('overwrite', '1', isset($_POST['insert']) ? true : ''); ?> <?php echo language::translate('text_overwrite_existing_entries', 'Overwrite existing entries'); ?></label></div>
         </div>
 
         <?php echo functions::form_draw_button('import', language::translate('title_import', 'Import'), 'submit'); ?>
@@ -195,7 +203,7 @@
 
         <div class="form-group">
           <label><?php echo language::translate('title_charset', 'Charset'); ?></label>
-          <?php echo functions::form_draw_select_field('charset', array(array('UTF-8'), array('ISO-8859-1')), true, false); ?>
+          <?php echo functions::form_draw_encodings_list('charset', !empty($_POST['charset']) ? true : 'UTF-8', false); ?>
         </div>
 
         <div class="form-group">
